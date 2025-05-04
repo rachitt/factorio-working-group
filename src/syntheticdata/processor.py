@@ -135,26 +135,33 @@ class EntityPuncher():
         )
 
     def _belt_chains(self, entities):
-        # naive: group belts by connected chains, reverse each chain
         from collections import defaultdict
+
         chains = []
-        unused = set([id(e) for e in entities if map_entity_to_key(e)=='belt'])
-        # print("\nUNUSED:\n" + str(unused))
-        # for e in entities:
-        #     print(str(e) + "\n\t" + str(e.direction) )
-        pos_map = {tuple(e.tile_position): e for e in entities if map_entity_to_key(e)=='belt'}
-        # print("\nPOS MAP: \n" + str(pos_map))
-        # print("\nPOS MAP: \n" + str(pos_map.get((1,0))))
+        unused = set([id(e) for e in entities if map_entity_to_key(e) == 'belt'])
+        pos_map = {tuple(e.tile_position): e for e in entities if map_entity_to_key(e) == 'belt'}
+
+        # Correct 4-way direction mapping
+        direction_to_vector = {
+            0: (0, -1),  # Up (north)
+            2: (0, 1),   # Down (south)
+            4: (-1, 0),  # Left (west)
+            6: (1, 0),   # Right (east)
+        }
+
         for e in entities:
-            if map_entity_to_key(e)!='belt' or id(e) not in unused: continue
+            if map_entity_to_key(e) != 'belt' or id(e) not in unused:
+                continue
+
             chain = [e]
             unused.remove(id(e))
-            # walk one direction until no neighbor
             cur = e
+
             while True:
+                direction_vector = direction_to_vector.get(cur.direction, (0, 0))
                 nbr_pos = (
-                    cur.tile_position[0] + cur.direction.vector[0], # x pos?
-                    cur.tile_position[1] + cur.direction.vector[1]  # y pos?
+                    cur.tile_position[0] + direction_vector[0],
+                    cur.tile_position[1] + direction_vector[1]
                 )
                 nbr = pos_map.get(tuple(nbr_pos), None)
                 if nbr and id(nbr) in unused:
@@ -163,8 +170,11 @@ class EntityPuncher():
                     cur = nbr
                 else:
                     break
+
             chains.append(list(reversed(chain)))
+
         return [e for chain in chains for e in chain]
+
 
     def _inserters_ready(self, entities, removed_ids):
         ready = []
@@ -284,3 +294,36 @@ def load_training_data(dataset_name, **kwargs):
             y.append(v_mat)
             indices.append(ix)
     return np.array(Xs), y, np.array(indices)
+
+# if __name__ == "__main__":
+#     import matplotlib.pyplot as plt
+
+#     fl = FactoryLoader(datasets["av-redscience"])
+#     k, factory = next(iter(fl.factories.items()))
+#     print("Loaded factory:", k)
+
+#     ep = EntityPuncher(factory)
+#     X_before, X_after, y = ep.generate_state_action_pairs(num_pairs=5)
+#     print("Generated shapes:", X_before.shape, X_after.shape, y.shape)
+
+#     def visualize_sample(before, after, label, index):
+#         fig, axes = plt.subplots(2, 4, figsize=(14, 6))
+#         channel_names = ['Assembler', 'Inserter', 'Belt', 'Pole']
+#         for i in range(4):
+#             axes[0, i].imshow(before[:, :, i], cmap='gray')
+#             axes[0, i].set_title(f"Before - {channel_names[i]}")
+#             axes[0, i].axis('off')
+
+#             axes[1, i].imshow(after[:, :, i], cmap='gray')
+#             axes[1, i].set_title(f"After - {channel_names[i]}")
+#             axes[1, i].axis('off')
+
+#         plt.suptitle(f"Sample {index+1} | Removed Channel Index: {label}")
+#         plt.tight_layout()
+#         plt.show()
+
+#     # Show all 5 samples
+#     print(len(X_before))
+#     for i in range(len(X_before)):
+#         visualize_sample(X_before[i], X_after[i], y[i], i)
+
